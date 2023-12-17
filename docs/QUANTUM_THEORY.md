@@ -1,115 +1,161 @@
 # Quantum-Inspired Computing in AETHER-Link
 
-> Why treating I/O as a quantum measurement problem makes sense
+> **What the code actually does vs. the mathematical formalism it draws from.**
 
-## The Classical Prefetching Problem
+## Overview
 
-Traditional prefetchers use deterministic heuristics:
-- **Stride detection**: If requests are sequential, prefetch next N blocks
-- **Markov chains**: Track transition probabilities between LBAs
-- **ML models**: Neural networks predicting next access (expensive!)
+AETHER-Link v0.2.0 implements a real-time adaptive prefetch decision engine.
+It draws three concepts from quantum mechanics — Bloch sphere encoding, POVM
+observables, and adaptive basis rotation — and translates them into classical
+floating-point operations on CPU hardware.
 
-**The problem**: These methods either:
-1. React too slowly (wait for pattern to emerge)
-2. Waste resources (prefetch wrong blocks)
-3. Add overhead (ML inference takes milliseconds)
+**The implementation is real. The quantum mechanics is structural, not literal.**
 
-## The Quantum Measurement Analogy
+---
 
-AETHER-Link treats each I/O event as a **quantum measurement** of an unknown workload state.
+## 1. Telemetry Features (real DSP)
 
-### Classical vs Quantum Thinking
+Six features are extracted from the LBA stream at ~1.4 ns:
 
-| Classical Approach | Quantum-Inspired Approach |
-|-------------------|---------------------------|
-| "What is the next LBA?" | "What is the probability distribution over possible LBAs?" |
-| Deterministic prediction | Probabilistic decision |
-| Fixed thresholds | Adaptive thresholds that evolve |
-| Pattern matching | State space exploration |
+| Symbol | Name | Computation |
+|--------|------|-------------|
+| Δ | Delta | `last_lba − first_lba` |
+| V | Velocity | `Δ × 0.5` |
+| σ² | Variance | **Welford online algorithm** over all observed streams |
+| C | Chebyshev | Running RMS of inter-stream delta differences |
+| H | History | Fixed exponential decay weight (0.8) |
+| Ω | Context | Log-density entropy of recent inter-arrival rates |
 
-### The Analogy Explained
+*In v0.1.0, features 2–5 were hardcoded constants. In v0.2.0 all six are live DSP.*
 
-1. **The Workload State (ψ)**
-   - The "true" workload pattern is unknown, like a quantum state before measurement
-   - We can only observe individual I/O requests (measurements)
-   - Each measurement collapses possibilities but reveals information
+---
 
-2. **POVM (Positive Operator-Valued Measure)**
-   - In quantum mechanics: A generalized measurement that extracts information
-   - In AETHER-Link: Our adaptive decision gate that optimally extracts "should prefetch?" from telemetry
-   - Key insight: **The measurement basis itself is adaptive**
+## 2. Bloch Sphere Encoding (classical mapping)
 
-3. **Adaptive Basis Rotation (φ)**
-   - Quantum systems: Rotating measurement basis to align with state
-   - AETHER-Link: Rotating our decision function to align with workload
-   - This is the "learning" without explicit training
+The six features are combined into a 3D Bloch vector using Chebyshev-weighted
+angular combination:
 
-## Mathematical Connection
+```
+θᵢ = 2 × atan(fᵢ / scaleᵢ)    ∈ (−π, π)    // polar angle per feature
+φ  = weighted azimuthal average              ∈ [−π, π]
 
-### Quantum State Encoding
+rx = sin(θ/2) × cos(φ)          // Cartesian coordinates
+ry = sin(θ/2) × sin(φ)
+rz = cos(θ/2)
 
-We map telemetry features to angles on a Bloch sphere:
+‖[rx, ry, rz]‖ = 1              // Normalised via fast_inv_sqrt
+```
 
-$$|\psi\rangle = \cos(\theta/2)|0\rangle + e^{i\phi}\sin(\theta/2)|1\rangle$$
+**Why this is quantum-inspired:** The Bloch sphere is the exact state
+representation for a single qubit in quantum mechanics.  Mapping features to
+angles on S² gives a bounded, continuous representation suitable for
+angular measurement observables.
 
-In AETHER:
-$$\theta_i = 2 \cdot \arctan(f_i)$$
+**Why this is classical:** The "quantum state" is a 3D unit vector computed
+from observable I/O statistics.  There is no superposition, entanglement,
+or quantum hardware involved.
 
-This maps real-valued features to bounded angular space, similar to how quantum states exist on the unit sphere.
+---
 
-### Observable Expectation
+## 3. POVM Measurement (classical angular projection)
 
-Our "observable" evaluation:
-$$\langle O \rangle = \cos(\theta + \phi)$$
+In quantum mechanics, a POVM (Positive Operator-Valued Measure) is a set of
+measurement operators {Eₘ} that satisfy ∑Eₘ = I and produce probability
+p(m) = ⟨ψ|Eₘ|ψ⟩ for state |ψ⟩.
 
-This mimics measuring a qubit in a rotated basis. The result:
-- Depends on both the state (θ) and measurement choice (φ)
-- Ranges from -1 to +1 (like quantum expectation values)
-- Can be efficiently computed (~1ns)
+AETHER-Link implements three POVM-style angular observables:
 
-### Adaptive Evolution
+```
+E₁(φ) = cos(θ + φ)     // Spatial observable
+         Measures alignment of LBA velocity with the adaptive basis φ.
+         Range: [−1, 1]. Drives threshold adaptation.
 
-After each measurement, we update:
-$$\phi_{t+1} = \phi_t + \lambda \langle O \rangle$$
+E₂(φ) = sin(θ/2 − φ)    // Temporal observable
+         Measures orthogonal phase component.
+         Range: [−1, 1]. Drives adaptive basis rotation.
 
-This is analogous to:
-- **Quantum feedback control**: Adjusting measurement basis based on results
-- **Bayesian updating**: Incorporating new evidence into prior beliefs
+E₃(φ) = cos(θ · φ_az)   // Spectral observable
+         Measures spectral energy in the current POVM basis.
+         Range: [−1, 1]. Drives fetch sigmoid.
+```
 
-## Why This Works for HFT
+These are evaluated as plain `libm::cosf` / `libm::sinf` calls — no quantum
+hardware required.
 
-High-frequency trading I/O has unique properties:
+---
 
-1. **Non-stationary**: Patterns shift with market regimes
-2. **Burst**: Quiet periods interrupted by intense activity
-3. **Latency-critical**: Can't wait for pattern detection
+## 4. Adaptive Basis Rotation (classical feedback)
 
-Quantum-inspired approach advantages:
+After each measurement:
 
-| Challenge | Quantum Solution |
-|-----------|-----------------|
-| Non-stationary | Continuous adaptation via φ evolution |
-| Burst detection | Rapid state "collapse" to new pattern |
-| Low latency | O(1) decision = ~18ns |
+```
+φ_{t+1} = φ_t + λ₂ × E₂(φ_t)    (mod 2π)
+ε_{t+1} = ε_t + λ₁ × E₁(φ_t)    (clamped to [0.1, 0.9])
+p_fetch = sigmoid(−(λ₃ × E₃(φ_t) + bias))
+```
 
-## Not Actually Quantum
+This is mathematically analogous to:
+- **Quantum feedback control**: Adjusting the measurement basis based on the
+  result of the previous measurement.
+- **Bayesian updating**: Incorporating new evidence (E₁, E₂, E₃) into the
+  prior belief about the workload state (encoded in φ).
 
-**Important**: AETHER-Link is **quantum-inspired**, not quantum computing.
+The feedback is continuous, bounded, and has no trained parameters.
 
-We borrow concepts:
-- ✅ Probabilistic state representation
-- ✅ Measurement-induced updates
-- ✅ Adaptive basis rotation
+---
 
-We don't use:
-- ❌ Actual qubits or quantum hardware
-- ❌ Superposition or entanglement
-- ❌ Quantum gates or circuits
+## 5. What Is NOT Quantum
 
-The benefit is the **mathematical framework**, not quantum speedup.
+AETHER-Link does not use:
 
-## Further Reading
+| Claimed quantum feature | Actual implementation |
+|------------------------|----------------------|
+| Qubits | 3-element float vector on S² |
+| Superposition | Weighted feature sum |
+| Entanglement | None (single-stream processing) |
+| Quantum gates | `cos`/`sin` trig functions |
+| Actual POVM hardware | Classical angular projections |
+| Quantum speedup | None — O(1) classical ops |
 
-- Original paper: [DOI: 10.13140/RG.2.2.22443.91687](https://www.researchgate.net/publication/398493933)
-- POVM in quantum information: Nielsen & Chuang, Chapter 2
-- Adaptive quantum measurement: Wiseman & Milburn, "Quantum Measurement and Control"
+---
+
+## 6. Why the Quantum Formalism Is Still Useful
+
+The Bloch/POVM language is not marketing — it encodes genuine constraints:
+
+1. **Bounded measurements**: Angular observables naturally produce values in
+   [−1, 1], which is ideal for adaptive thresholds.  Raw I/O statistics have
+   no such bound.
+
+2. **Adaptive basis**: The quantum-inspired basis rotation (φ update) is a
+   well-studied way to continuously track a non-stationary signal without
+   retraining.  This is also the core idea in quantum state tomography.
+
+3. **Spherical geometry**: Constraining the state to S² prevents the decision
+   signal from diverging to arbitrarily large magnitudes — a real failure mode
+   in unbounded linear feedback systems.
+
+---
+
+## 7. Accuracy Improvements in v0.2.0
+
+| Component | v0.1.0 | v0.2.0 |
+|-----------|--------|--------|
+| `fast_atan` | Padé: **76% error** at x=10 | `libm::atanf`: ≤ 1 ULP |
+| `variance` | hardcoded `0.1` | Welford online variance |
+| `spectrum` | hardcoded `0.01` | Chebyshev RMS energy |
+| `history` | hardcoded `0.8` | Decay-weighted temporal |
+| `context` | hardcoded `1.0` | Log-density entropy |
+| Bloch norm | absent (unnormalised) | `fast_inv_sqrt` unit sphere |
+| `simulate_qpu_eval` | scalar trig mock | real POVM observables |
+
+---
+
+## References
+
+- Nielsen & Chuang, *Quantum Computation and Quantum Information*, Chapter 2
+  (POVM formalism)
+- Wiseman & Milburn, *Quantum Measurement and Control* (adaptive basis rotation)
+- Welford, "Note on a Method for Calculating Corrected Sums of Squares and
+  Products" (online variance)
+- Quake III `rsqrt`: fast inverse square root (fast_inv_sqrt)
