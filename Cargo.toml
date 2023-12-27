@@ -9,13 +9,14 @@ repository = "https://github.com/teerthsharma/aether-link"
 homepage = "https://github.com/teerthsharma/aether-link"
 documentation = "https://docs.rs/aether-link"
 readme = "README.md"
-keywords = ["io", "prefetch", "nvme", "directstorage", "kernel"]
-categories = ["hardware-support", "algorithms", "os"]
+keywords = ["io", "prefetch", "nvme", "directstorage", "kernel", "async", "tokio"]
+categories = ["hardware-support", "algorithms", "os", "asynchronous"]
 rust-version = "1.70"
 
 [features]
 default = []
 windows-directstorage = ["windows"]
+tokio-runtime = ["tokio/rt", "tokio/rt-multi-thread", "tokio/sync", "dep:tokio"]
 
 [dependencies]
 libm = "0.2"
@@ -25,6 +26,7 @@ windows = { version = "0.52", features = [
     "Win32_Foundation",
     "Win32_System_IO",
 ], optional = true }
+tokio = { version = "1", features = ["rt", "rt-multi-thread", "sync", "macros"], optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5", features = ["html_reports"] }
@@ -40,6 +42,11 @@ path = "examples/basic_usage.rs"
 [[example]]
 name = "streaming_io"
 path = "examples/streaming_io.rs"
+
+[[example]]
+name = "tokio_integration"
+path = "examples/tokio_integration.rs"
+required-features = ["tokio-runtime"]
 
 [profile.release]
 lto = true

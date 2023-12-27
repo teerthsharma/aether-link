@@ -1,5 +1,5 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use aether_link::AetherLinkKernel;
+use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 fn bench_core_functions(c: &mut Criterion) {
     let mut kernel = AetherLinkKernel::new(0.5, 0.1, [0.1, 0.2, 0.3], 0.05);
@@ -54,9 +54,7 @@ fn bench_stream_sizes(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::from_parameter(size),
             &lba_stream,
-            |b, stream| {
-                b.iter(|| kernel.process_io_cycle(black_box(stream)))
-            },
+            |b, stream| b.iter(|| kernel.process_io_cycle(black_box(stream))),
         );
     }
 
@@ -69,17 +67,11 @@ fn bench_fast_math(c: &mut Criterion) {
     let mut group = c.benchmark_group("Fast Math");
     group.throughput(Throughput::Elements(1));
 
-    group.bench_function("fast_atan", |b| {
-        b.iter(|| fast_atan(black_box(1.5)))
-    });
+    group.bench_function("fast_atan", |b| b.iter(|| fast_atan(black_box(1.5))));
 
-    group.bench_function("fast_exp", |b| {
-        b.iter(|| fast_exp(black_box(-0.5)))
-    });
+    group.bench_function("fast_exp", |b| b.iter(|| fast_exp(black_box(-0.5))));
 
-    group.bench_function("fast_sigmoid", |b| {
-        b.iter(|| fast_sigmoid(black_box(0.3)))
-    });
+    group.bench_function("fast_sigmoid", |b| b.iter(|| fast_sigmoid(black_box(0.3))));
 
     group.finish();
 }

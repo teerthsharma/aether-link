@@ -307,7 +307,7 @@ impl AetherLinkKernel {
         let t1 = fast_atan(features[1] / 32.0) * 2.0; // velocity
         let t2 = fast_atan(features[2] / 128.0) * 2.0; // variance (typically small)
         let t3 = fast_atan(features[3] / 16.0) * 2.0; // spectrum
-        let t4 = fast_atan(features[4]) * 2.0;        // history ∈ [0, 1]
+        let t4 = fast_atan(features[4]) * 2.0; // history ∈ [0, 1]
         let t5 = fast_atan((features[5] - 1.0) / 4.0) * 2.0; // entropy offset
 
         // Chebyshev weights (spectral → spatial → temporal ordering).
@@ -315,8 +315,7 @@ impl AetherLinkKernel {
         let w = [0.5_f32, 0.3, 0.1, 0.05, 0.03, 0.02];
 
         // Bloch vector components via spherical combination.
-        let theta = (t0 * w[0] + t1 * w[1] + t2 * w[2]
-                   + t3 * w[3] + t4 * w[4] + t5 * w[5])
+        let theta = (t0 * w[0] + t1 * w[1] + t2 * w[2] + t3 * w[3] + t4 * w[4] + t5 * w[5])
             / (w[0] + w[1] + w[2] + w[3] + w[4] + w[5]);
 
         let phi_az = (t0 * 0.6 + t1 * 0.3 + t3 * 0.1) / (w[0] + w[1] + w[3]);
@@ -334,7 +333,11 @@ impl AetherLinkKernel {
 
         // Normalise to unit length using fast_inv_sqrt.
         let r2 = rx * rx + ry * ry + rz * rz;
-        let r_inv = if r2 > 1e-8 { fast_math::fast_inv_sqrt(r2) } else { 1.0 };
+        let r_inv = if r2 > 1e-8 {
+            fast_math::fast_inv_sqrt(r2)
+        } else {
+            1.0
+        };
         let rx = rx * r_inv;
         let ry = ry * r_inv;
         let rz = rz * r_inv;

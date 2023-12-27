@@ -1,5 +1,6 @@
 # AETHER-Link
 [![Crates.io](https://img.shields.io/crates/v/aether-link.svg)](https://crates.io/crates/aether-link)
+[![MSRV](https://img.shields.io/badge/MSRV-1.70-orange)](https://doc.rust-lang.org/cargo/reference/manifest.html#the-rust-version-field)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](#license)
 
 A sub-20 ns I/O prefetching kernel written in Rust, designed for latency-critical applications:
@@ -52,6 +53,11 @@ if kernel.process_io_cycle(&lba_stream) {
     println!("Deferring to OS page cache.");
 }
 ```
+
+## Requirements
+
+- **Rust**: 1.70 or later (MSRV)
+- **Architecture**: x86_64, AArch64, or RISC-V with FPU
 
 ## How It Works
 
