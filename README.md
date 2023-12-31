@@ -1,4 +1,6 @@
 # AETHER-Link
+*Invented by [Teerth Sharma](https://teerthsharma.vercel.app)*
+
 [![Crates.io](https://img.shields.io/crates/v/aether-link.svg)](https://crates.io/crates/aether-link)
 [![MSRV](https://img.shields.io/badge/MSRV-1.70-orange)](https://doc.rust-lang.org/cargo/reference/manifest.html#the-rust-version-field)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-blue.svg)](#license)
