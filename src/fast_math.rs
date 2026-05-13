@@ -171,7 +171,10 @@ mod tests {
         // fast_sqrt uses Quake III fast_inv_sqrt (one Newton step).
         // Error is ~0.3 % for this algorithm, so 0.01 is the right bound.
         assert!((fast_sqrt(9.0) - 3.0).abs() < 0.01, "sqrt(9)");
-        assert!((fast_sqrt(2.0) - 1.4142136).abs() < 0.01, "sqrt(2)");
+        assert!(
+            (fast_sqrt(2.0) - std::f32::consts::SQRT_2).abs() < 0.01,
+            "sqrt(2)"
+        );
         assert!((fast_sqrt(0.25) - 0.5).abs() < 0.005, "sqrt(0.25)");
         assert!(fast_sqrt(0.0) == 0.0);
     }

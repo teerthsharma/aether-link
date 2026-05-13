@@ -50,7 +50,7 @@ fn bench_stream_sizes(c: &mut Criterion) {
         let lba_stream: Vec<u64> = (0..*size).collect();
         let mut kernel = AetherLinkKernel::default();
 
-        group.throughput(Throughput::Elements(*size as u64));
+        group.throughput(Throughput::Elements(*size));
         group.bench_with_input(
             BenchmarkId::from_parameter(size),
             &lba_stream,

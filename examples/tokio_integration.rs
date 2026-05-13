@@ -8,6 +8,7 @@ use tokio::sync::RwLock;
 
 /// Async wrapper for AetherLinkKernel with tokio runtime support.
 /// Allows non-blocking I/O decision processing in async contexts.
+#[derive(Clone)]
 pub struct AsyncAetherLink {
     kernel: Arc<RwLock<AetherLinkKernel>>,
 }
@@ -45,13 +46,6 @@ impl AsyncAetherLink {
     pub async fn prefetch_ratio(&self) -> f32 {
         let kernel = self.kernel.read().await;
         kernel.prefetch_ratio()
-    }
-
-    /// Clone is cheap (Arc sharing).
-    pub fn clone(&self) -> Self {
-        Self {
-            kernel: Arc::clone(&self.kernel),
-        }
     }
 }
 

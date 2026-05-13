@@ -381,12 +381,7 @@ impl AetherLinkKernel {
 
         // Adaptive threshold evolution (feedback from spatial observable).
         self.epsilon += self.lambda[0] * o1;
-        if self.epsilon < 0.1 {
-            self.epsilon = 0.1;
-        }
-        if self.epsilon > 0.9 {
-            self.epsilon = 0.9;
-        }
+        self.epsilon = self.epsilon.clamp(0.1, 0.9);
 
         // Fetch probability via sigmoid on the spectral observable.
         let exponent = -(self.lambda[2] * o3 + self.bias);
